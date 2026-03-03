@@ -735,17 +735,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 window.shareBill = async (id) => {
   await showInvoice(id);
   const element = document.getElementById('invoice');
+  if (!element) return;
+
+  // Ensure the element is visible for html2pdf
+  element.classList.remove('hidden');
+
   const billNo = document.getElementById('inv-no').textContent || 'bill';
 
   const opt = {
     margin: 10,
     filename: `Bill_${billNo}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
   try {
+    // Small delay to ensure all content (totals, logo) is painted
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
     const file = new File([pdfBlob], `Bill_${billNo}.pdf`, { type: 'application/pdf' });
 
@@ -763,6 +771,11 @@ window.shareBill = async (id) => {
   } catch (err) {
     console.error('Sharing failed:', err);
     alert('Failed to generate or share PDF.');
+  } finally {
+    // We don't necessarily want to hide it if we are viewing it, 
+    // but showInvoice(id) is usually called from View or Edit which might expect it visible.
+    // However, the tab switch logic might hide it. 
+    // For now, let's keep it visible since it's the "Invoice" being generated.
   }
 };
 
@@ -781,15 +794,23 @@ if (shareBillWaBtn) {
 window.generatePdf = async (id) => {
   await showInvoice(id);
   const element = document.getElementById('invoice');
+  if (!element) return;
+
+  element.classList.remove('hidden');
+
   const billNo = document.getElementById('inv-no').textContent || 'bill';
   const opt = {
     margin: 10,
     filename: `Bill_${billNo}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
-  html2pdf().set(opt).from(element).save();
+
+  // Wait for rendering
+  setTimeout(() => {
+    html2pdf().set(opt).from(element).save();
+  }, 500);
 };
 
 const savePdfBtn = document.getElementById('save-pdf-btn');
