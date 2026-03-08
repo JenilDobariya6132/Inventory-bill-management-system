@@ -238,7 +238,16 @@
         <div class="form-grid">
           <input type="text" id="bill-number" placeholder="Bill Number" />
           <input type="date" id="bill-date" />
-          <select id="bill-customer"></select>
+          <select id="bill-customer" class="hidden"></select>
+          <div id="customer-search" class="item-search-container">
+            <button type="button" id="customer-dropdown-btn" class="item-dropdown-btn">Select Customer</button>
+            <div class="dropdown-menu hidden">
+              <input type="text" id="customer-search-input" class="item-search-input"
+                placeholder="Search customers..." />
+              <ul id="customer-search-results" class="item-search-results"></ul>
+            </div>
+            <input type="hidden" id="customer-selected-id" />
+          </div>
         </div>
         <div class="items-grid">
           <div class="grid-header">
@@ -260,94 +269,8 @@
         </div>
         <div class="actions">
           <button id="save-bill">Save Bill</button>
-          <button id="save-pdf-btn" class="btn btn-primary">Save as PDF</button>
-          <button id="share-bill-wa" class="btn btn-success">Share PDF on WhatsApp</button>
-        </div>
-      </div>
-      <div id="invoice" class="card print-area hidden invoice">
-        <div class="inv-header">
-          <div class="inv-company">
-            <div class="inv-title">INVOICE</div>
-            <div class="company-block">
-              <div class="company-name" id="company-name">Your Company</div>
-              <div id="company-address">Address</div>
-              <div id="company-email">Email</div>
-              <div id="company-phone">Phone</div>
-            </div>
-          </div>
-          <div class="inv-logo"><img id="inv-logo-img" src="logo.jpg" alt="Alakhdhani Hardware logo"></div>
-        </div>
-        <div class="inv-meta">
-          <div class="bill-to">
-            <div class="label">Bill To</div>
-            <div id="inv-billto"></div>
-          </div>
-          <div class="meta-table">
-            <table>
-              <tbody>
-                <tr>
-                  <td>Invoice No</td>
-                  <td id="inv-no"></td>
-                </tr>
-                <tr>
-                  <td>Invoice Date</td>
-                  <td id="inv-date"></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <table id="invoice-items" class="inv-items">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Description</th>
-              <th>Size (in)</th>
-              <th>Qty</th>
-              <th>Rate</th>
-              <th>Amount</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-        <div class="inv-summary">
-          <div class="totals-box">
-            <table>
-              <tbody>
-                <tr>
-                  <td>Subtotal</td>
-                  <td id="tot-sub">0.00</td>
-                </tr>
-                <tr>
-                  <td>GST <span id="tot-gst-percent"></span></td>
-                  <td id="tot-gst">0.00</td>
-                </tr>
-                <tr>
-                  <td>Discount</td>
-                  <td id="tot-discount">0.00</td>
-                </tr>
-                <tr class="grand">
-                  <td>Grand Total</td>
-                  <td id="tot-grand">0.00</td>
-                </tr>
-                <tr>
-                  <td>Paid Amount</td>
-                  <td id="tot-paid">0.00</td>
-                </tr>
-                <tr>
-                  <td>Pending Amount</td>
-                  <td id="tot-pending">0.00</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="inv-footer">
-          <div class="notes">
-            <div>Payment instructions</div>
-            <div>Thank you for your business</div>
-          </div>
-          <div class="signature">Authorized Signatory</div>
+          <button id="new-bill-save-pdf" class="btn btn-primary">Save PDF</button>
+          <button id="new-bill-share-pdf" class="btn">Share PDF</button>
         </div>
       </div>
     </section>
@@ -432,6 +355,7 @@
         <input type="date" id="out-to" />
         <button id="out-fetch">Fetch</button>
         <button id="out-export-csv">Export Excel</button>
+
       </div>
       <div class="card" id="out-print-area">
         <table id="out-table">
@@ -467,10 +391,97 @@
     </section>
   </main>
 
+  <div id="invoice" class="card print-area hidden invoice-tax">
+    <div class="actions" style="display:flex; gap:8px; justify-content:flex-end; margin-bottom:8px;">
+      <button id="invoice-save-pdf" class="btn btn-primary">Save PDF</button>
+      <button id="invoice-share-pdf" class="btn">Share PDF</button>
+    </div>
+    <div class="tax-header">
+      <div class="company-brand" id="company-name">RAVE INDIA LTD.</div>
+      <div class="company-sub" id="company-address">11/9, Jangpura, Bhogal, New Delhi-110014</div>
+      <div class="company-sub">GSTIN: <span id="company-gst">07AAFD8457JU3</span></div>
+      <div class="company-sub">PAN NO. <span id="company-pan">AAACR1789Q</span></div>
+    </div>
+
+    <div class="tax-title-bar">TAX INVOICE</div>
+
+    <div class="tax-meta-grid">
+      <div class="meta-left">
+        <div class="label">PARTY'S DETAILS:</div>
+        <div id="inv-party-details" class="value">
+          <strong>M/S CONNECT MARKETING</strong><br>
+          SARTIA VIHAR, NEW DELHI-110076<br>
+          GSTIN: 07NNFD8457JU3
+        </div>
+      </div>
+      <div class="meta-right">
+        <div class="meta-row">
+          <div class="label">INVOICE NO.</div>
+          <div class="value" id="inv-no">92512 / 2017-18</div>
+        </div>
+        <div class="meta-row">
+          <div class="label">INVOICE DATE :</div>
+          <div class="value" id="inv-date">15-02-2018</div>
+        </div>
+      </div>
+    </div>
+
+    <table class="tax-items-table">
+      <thead>
+        <tr>
+          <th style="width: 50%;">Items</th>
+          <th style="width: 15%;">SIZE</th>
+          <th style="width: 10%;">QTY</th>
+          <th style="width: 10%;">RATE</th>
+          <th style="width: 15%;">AMOUNT</th>
+        </tr>
+      </thead>
+      <tbody id="invoice-items-body">
+        <!-- Dynamic rows -->
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="4" style="text-align: right;">TOTAL AMOUNT</td>
+          <td id="tot-sub">300.00</td>
+        </tr>
+        <tr class="tax-row">
+          <td colspan="2" rowspan="2"></td>
+          <td colspan="2">Add: CGST <span id="cgst-pct">9</span>%</td>
+          <td id="tot-cgst">15.00</td>
+        </tr>
+        <tr class="tax-row">
+          <td colspan="2">Add: SGST <span id="sgst-pct">9</span>%</td>
+          <td id="tot-sgst">15.00</td>
+        </tr>
+        <tr class="grand-total-row">
+          <td colspan="4" style="text-align: right;">GRAND TOTAL</td>
+          <td id="tot-grand">330.00</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="tax-bottom-info">
+      <div class="amount-words">
+        <span class="label">Total Amount (INR - In Words) :</span>
+        <div id="tot-words" class="value">Twenty Three Thousand Only</div>
+      </div>
+    </div>
+
+    <div class="tax-footer">
+      <div class="signatory-section">
+        <div class="company-sign-label">For <span id="footer-company-name">RAVE INDIA LTD.</span></div>
+        <div class="sign-space"></div>
+        <div class="sign-label">Authorised Signatory</div>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     <span>Inventory & Billing System</span>
   </footer>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="app.js"></script>
 </body>

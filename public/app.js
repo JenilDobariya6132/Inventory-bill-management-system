@@ -264,6 +264,12 @@ itemForm.addEventListener('submit', async (e) => {
 const customerForm = document.getElementById('customer-form');
 const customersTableBody = document.querySelector('#customers-table tbody');
 const billCustomerSelect = document.getElementById('bill-customer');
+const custSearchContainer = document.getElementById('customer-search');
+const custDropdownBtn = document.getElementById('customer-dropdown-btn');
+const custDropdownMenu = document.getElementById('customer-search')?.querySelector('.dropdown-menu');
+const custSearchInput = document.getElementById('customer-search-input');
+const custResultsList = document.getElementById('customer-search-results');
+const custSelectedId = document.getElementById('customer-selected-id');
 let customersCache = [];
 async function loadCustomers() {
   const res = await fetch(API.customers);
@@ -280,7 +286,64 @@ async function loadCustomers() {
     </tr>`).join('');
   billCustomerSelect.innerHTML = '<option value=\"\">Select Customer</option>' +
     customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  setCustomerDropdownLabel();
 }
+function setCustomerDropdownLabel() {
+  if (!custDropdownBtn) return;
+  const id = Number(billCustomerSelect?.value || 0);
+  const c = customersCache.find(x => x.id === id);
+  custDropdownBtn.textContent = c ? c.name : 'Select Customer';
+}
+function renderCustomerResults(list) {
+  if (!custResultsList) return;
+  if (!list || list.length === 0) {
+    custResultsList.innerHTML = '<li class="no-results">No customers found</li>';
+  } else {
+    custResultsList.innerHTML = list.map(i => `<li data-id="${i.id}" data-name="${i.name}">${i.name}</li>`).join('');
+  }
+}
+if (custDropdownBtn) {
+  custDropdownBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+    if (custDropdownMenu?.classList.contains('hidden')) {
+      custDropdownMenu.classList.remove('hidden');
+      custSearchInput?.focus();
+      renderCustomerResults(customersCache);
+    } else {
+      custDropdownMenu.classList.add('hidden');
+    }
+  });
+}
+if (custSearchInput) {
+  custSearchInput.addEventListener('input', () => {
+    const val = custSearchInput.value.toLowerCase().trim();
+    const filtered = customersCache.filter(i =>
+      i.name.toLowerCase().includes(val) ||
+      String(i.phone || '').toLowerCase().includes(val) ||
+      String(i.gst_id || '').toLowerCase().includes(val)
+    );
+    renderCustomerResults(filtered);
+  });
+}
+if (custResultsList) {
+  custResultsList.addEventListener('click', (e) => {
+    if (e.target.tagName === 'LI' && !e.target.classList.contains('no-results')) {
+      const li = e.target;
+      const id = Number(li.dataset.id);
+      if (custSelectedId) custSelectedId.value = String(id);
+      if (billCustomerSelect) billCustomerSelect.value = String(id);
+      setCustomerDropdownLabel();
+      custDropdownMenu?.classList.add('hidden');
+      recalcTotals();
+    }
+  });
+}
+document.addEventListener('click', (e) => {
+  if (custSearchContainer && !custSearchContainer.contains(e.target)) {
+    custDropdownMenu?.classList.add('hidden');
+  }
+});
 window.editCustomerById = (id) => {
   const c = customersCache.find(x => x.id === id);
   if (!c) return;
@@ -349,6 +412,8 @@ const grandTotalEl = document.getElementById('grand-total');
 const paidAmountEl = document.getElementById('paid-amount');
 const pendingAmountEl = document.getElementById('pending-amount');
 const saveBillBtn = document.getElementById('save-bill');
+const newBillSavePdfBtn = document.getElementById('new-bill-save-pdf');
+const newBillSharePdfBtn = document.getElementById('new-bill-share-pdf');
 const invoiceArea = document.getElementById('invoice');
 const invoiceItemsBody = document.querySelector('#invoice-items tbody');
 const invBillTo = document.getElementById('inv-billto');
@@ -369,9 +434,34 @@ async function refreshItemOptions() {
 function makeItemRow() {
   const row = document.createElement('div');
   row.className = 'row';
-  const select = document.createElement('select');
-  select.innerHTML = '<option value=\"\">Select Item</option>' +
-    itemOptionsCache.map(i => `<option value="${i.id}" data-size="${i.size || ''}" data-price="${i.price}">${i.name}</option>`).join('');
+
+  // Searchable Item Container
+  const searchContainer = document.createElement('div');
+  searchContainer.className = 'item-search-container';
+
+  const dropdownBtn = document.createElement('button');
+  dropdownBtn.type = 'button';
+  dropdownBtn.className = 'item-dropdown-btn';
+  dropdownBtn.textContent = 'Select Item';
+
+  const dropdownMenu = document.createElement('div');
+  dropdownMenu.className = 'dropdown-menu hidden';
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Search items...';
+  searchInput.className = 'item-search-input';
+
+  const resultsList = document.createElement('ul');
+  resultsList.className = 'item-search-results';
+
+  dropdownMenu.append(searchInput, resultsList);
+
+  const itemIdInput = document.createElement('input');
+  itemIdInput.type = 'hidden';
+
+  searchContainer.append(dropdownBtn, dropdownMenu, itemIdInput);
+
   const size = document.createElement('input'); size.type = 'number'; size.step = '0.01'; size.min = '0'; size.placeholder = 'Size';
   const price = document.createElement('input'); price.type = 'number'; price.step = '0.01'; price.placeholder = 'Price';
   const qty = document.createElement('input'); qty.type = 'number'; qty.placeholder = 'Qty'; qty.min = '1';
@@ -379,17 +469,56 @@ function makeItemRow() {
   const remove = document.createElement('button'); remove.className = 'btn btn-danger'; remove.textContent = 'Remove';
   remove.addEventListener('click', () => { row.remove(); recalcTotals(); });
 
-  select.addEventListener('change', () => {
-    const opt = select.selectedOptions[0] || {};
-    const ds = opt.dataset || {};
-    const sVal = ds.size || '';
-    const pVal = ds.price || '';
-    size.value = (sVal == '0' || sVal == '0.00') ? '' : sVal;
-    price.value = (pVal == '0' || pVal == '0.00') ? '' : pVal;
-    qty.value = '';
-    total.value = '';
-    recalcTotals();
+  // Toggle dropdown
+  dropdownBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = dropdownMenu.classList.contains('hidden');
+    // Close all other open dropdowns first
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+    if (isHidden) {
+      dropdownMenu.classList.remove('hidden');
+      searchInput.focus();
+      renderResults(itemOptionsCache);
+    }
   });
+
+  function renderResults(list) {
+    if (list.length === 0) {
+      resultsList.innerHTML = '<li class="no-results">No items found</li>';
+    } else {
+      resultsList.innerHTML = list.map(i => `<li data-id="${i.id}" data-size="${i.size || ''}" data-price="${i.price}">${i.name}</li>`).join('');
+    }
+  }
+
+  searchInput.addEventListener('input', () => {
+    const val = searchInput.value.toLowerCase().trim();
+    const filtered = itemOptionsCache.filter(i => i.name.toLowerCase().includes(val));
+    renderResults(filtered);
+  });
+
+  resultsList.addEventListener('click', (e) => {
+    if (e.target.tagName === 'LI' && !e.target.classList.contains('no-results')) {
+      const li = e.target;
+      itemIdInput.value = li.dataset.id;
+      dropdownBtn.textContent = li.textContent;
+      const sVal = li.dataset.size || '';
+      const pVal = li.dataset.price || '';
+      size.value = (sVal == '0' || sVal == '0.00') ? '' : sVal;
+      price.value = (pVal == '0' || pVal == '0.00') ? '' : pVal;
+      qty.value = '';
+      total.value = '';
+      dropdownMenu.classList.add('hidden');
+      recalcTotals();
+    }
+  });
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!searchContainer.contains(e.target)) {
+      dropdownMenu.classList.add('hidden');
+    }
+  });
+
   function updateTotal() {
     const q = Number(qty.value || 0);
     const p = Number(price.value || 0);
@@ -399,7 +528,7 @@ function makeItemRow() {
   qty.addEventListener('input', updateTotal);
   price.addEventListener('input', updateTotal);
 
-  row.append(select, size, price, qty, total, remove);
+  row.append(searchContainer, size, price, qty, total, remove);
   return row;
 }
 addItemRowBtn.addEventListener('click', async () => {
@@ -437,8 +566,8 @@ saveBillBtn.addEventListener('click', async () => {
   const editId = document.getElementById('edit-bill-id').value;
   const items = [];
   billItemsWrapper.querySelectorAll('.row').forEach(r => {
-    const select = r.children[0];
-    const item_id = Number(select.value);
+    const itemIdInput = r.querySelector('input[type="hidden"]');
+    const item_id = Number(itemIdInput.value);
     const price = Number(r.children[2].value || 0);
     const qty = Number(r.children[3].value || 0);
     const size = r.children[1].value;
@@ -473,6 +602,9 @@ saveBillBtn.addEventListener('click', async () => {
   if (editId) {
     document.getElementById('edit-bill-id').value = '';
     saveBillBtn.textContent = 'Save Bill';
+  } else {
+    // Set the ID so PDF/Share buttons work immediately
+    document.getElementById('edit-bill-id').value = data.bill.id;
   }
   // Show printable invoice
   await showInvoice(data.bill.id);
@@ -480,37 +612,118 @@ saveBillBtn.addEventListener('click', async () => {
   await loadBills();
 });
 
+
+function numberToWords(amount) {
+  const words = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const scales = ["", "Thousand", "Lakh", "Crore"];
+
+  if (amount === 0) return "Zero Only";
+
+  function convert(n) {
+    if (n < 20) return words[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + words[n % 10] : "");
+    return words[Math.floor(n / 100)] + " Hundred" + (n % 100 !== 0 ? " and " + convert(n % 100) : "");
+  }
+
+  let str = "";
+  let num = Math.floor(amount);
+
+  if (num >= 10000000) {
+    str += convert(Math.floor(num / 10000000)) + " Crore ";
+    num %= 10000000;
+  }
+  if (num >= 100000) {
+    str += convert(Math.floor(num / 100000)) + " Lakh ";
+    num %= 100000;
+  }
+  if (num >= 1000) {
+    str += convert(Math.floor(num / 1000)) + " Thousand ";
+    num %= 1000;
+  }
+  if (num > 0) {
+    str += convert(num);
+  }
+
+  return str.trim() + " Only";
+}
+
 async function showInvoice(id) {
   const res = await fetch(`${API.bills}/${id}`);
   const data = await res.json();
   const b = data.bill;
-  invNo.textContent = b.bill_number;
-  invDate.textContent = dateOnly(b.bill_date);
-  invBillTo.innerHTML = `
-    <div>${b.customer_name}</div>
-    <div>${b.address || ''}</div>
-    <div>${b.phone || ''}</div>
-    <div>${b.gst_id || ''}</div>
-  `;
-  invoiceItemsBody.innerHTML = data.items.map((i, idx) =>
-    `<tr>
-      <td>${idx + 1}</td>
-      <td>${i.name}</td>
-      <td>${(i.size == '0' || i.size == '0.00' || !i.size) ? '' : i.size}</td>
-      <td>${i.quantity}</td>
-      <td>${(Number(i.price) === 0) ? '' : Number(i.price).toFixed(2)}</td>
-      <td>${Number(i.total).toFixed(2)}</td>
-    </tr>`
-  ).join('');
-  totSub.textContent = Number(b.subtotal).toFixed(2);
-  totGstPct.textContent = `(${Number(b.gst_percent)}%)`;
-  totGst.textContent = Number(b.gst_amount).toFixed(2);
-  totDiscount.textContent = Number(b.discount).toFixed(2);
-  totGrand.textContent = Number(b.grand_total).toFixed(2);
-  const totPaid = document.getElementById('tot-paid');
-  const totPending = document.getElementById('tot-pending');
-  if (totPaid) totPaid.textContent = Number(b.paid_amount || 0).toFixed(2);
-  if (totPending) totPending.textContent = Number(b.pending_amount || 0).toFixed(2);
+
+  // Header
+  if (currentProfile) {
+    const compName = document.getElementById('company-name');
+    const compAddr = document.getElementById('company-address');
+    const compGst = document.getElementById('company-gst');
+    const compPan = document.getElementById('company-pan');
+    const footComp = document.getElementById('footer-company-name');
+
+    if (compName) compName.textContent = currentProfile.company_name || 'RAVE INDIA LTD.';
+    if (compAddr) compAddr.textContent = currentProfile.address || '';
+    if (compGst) compGst.textContent = currentProfile.gst_id || 'N/A';
+    if (compPan) compPan.textContent = currentProfile.pan_no || 'N/A';
+    if (footComp) footComp.textContent = currentProfile.company_name;
+  }
+
+  // Meta
+  const billDate = new Date(b.bill_date);
+  const finYear = `${billDate.getFullYear()} / ${billDate.getFullYear().toString().slice(-2)}-${(billDate.getFullYear() % 100 + 1)}`;
+  const invNoEl = document.getElementById('inv-no');
+  const invDateEl = document.getElementById('inv-date');
+  if (invNoEl) invNoEl.textContent = `${b.bill_number} / ${finYear}`;
+  if (invDateEl) invDateEl.textContent = dateOnly(b.bill_date);
+
+  // Party Details
+  const partyDetailsEl = document.getElementById('inv-party-details');
+  if (partyDetailsEl) {
+    partyDetailsEl.innerHTML = `
+      <strong>${b.customer_name}</strong><br>
+      ${b.address || ''}<br>
+      GSTIN: ${b.gst_id || 'N/A'}
+    `;
+  }
+
+  // Items Table
+  const itemsBody = document.getElementById('invoice-items-body');
+  if (itemsBody) {
+    itemsBody.innerHTML = data.items.map((i) =>
+      `<tr>
+        <td>${i.name}</td>
+        <td style="text-align: center;">${(i.size && i.size != '0' && i.size != '0.00') ? `${i.size} in` : '-'}</td>
+        <td style="text-align: center;">${i.quantity}</td>
+        <td style="text-align: right;">${Number(i.price).toFixed(2)}</td>
+        <td style="text-align: right;">${Number(i.total).toFixed(2)}</td>
+      </tr>`
+    ).join('');
+  }
+
+  // Totals
+  const subTotalEl = document.getElementById('tot-sub');
+  if (subTotalEl) subTotalEl.textContent = Number(b.subtotal).toFixed(2);
+
+  const gstPercent = Number(b.gst_percent);
+  const halfGst = (Number(b.gst_amount || 0) / 2).toFixed(2);
+  const halfPct = (gstPercent / 2);
+
+  const cgstPctEl = document.getElementById('cgst-pct');
+  const sgstPctEl = document.getElementById('sgst-pct');
+  const totCgstEl = document.getElementById('tot-cgst');
+  const totSgstEl = document.getElementById('tot-sgst');
+
+  if (cgstPctEl) cgstPctEl.textContent = halfPct;
+  if (sgstPctEl) sgstPctEl.textContent = halfPct;
+  if (totCgstEl) totCgstEl.textContent = halfGst;
+  if (totSgstEl) totSgstEl.textContent = halfGst;
+
+  const grandTotalEl = document.getElementById('tot-grand');
+  const wordsEl = document.getElementById('tot-words');
+
+  if (grandTotalEl) grandTotalEl.textContent = Number(b.grand_total).toFixed(2);
+  if (wordsEl) wordsEl.textContent = numberToWords(Number(b.grand_total));
+
   invoiceArea.classList.remove('hidden');
 }
 
@@ -534,9 +747,9 @@ async function loadBills(customerId) {
       <td>${Number(b.paid_amount || 0).toFixed(2)}</td><td><strong style="color:${Number(b.pending_amount || 0) > 0 ? '#ef4444' : '#16a34a'}">${Number(b.pending_amount || 0).toFixed(2)}</strong></td>
       <td>
         <button class="btn btn-primary" onclick="viewBill(${b.id})">View</button>
+        <button class="btn btn-primary" onclick="downloadInvoicePdf(${b.id})">Save PDF</button>
+        <button class="btn" onclick="shareInvoicePdf(${b.id})">Share PDF</button>
         <button class="btn btn-primary" onclick="editBill(${b.id})">Edit</button>
-        <button class="btn btn-primary" onclick="generatePdf(${b.id})">PDF</button>
-        <button class="btn btn-success" onclick="shareBill(${b.id})">Share PDF</button>
         <button class="btn btn-danger" onclick="deleteBill(${b.id})">Delete</button>
       </td>
     </tr>`).join('');
@@ -573,8 +786,6 @@ async function runSearch() {
       <td>${b.status}</td>
       <td>
         <button class="btn btn-primary" onclick="event.stopPropagation(); viewBill(${b.id}); document.querySelector('[data-tab=\\\"bills\\\"]').click();">View</button>
-        <button class="btn btn-primary" onclick="event.stopPropagation(); generatePdf(${b.id})">Save PDF</button>
-        <button class="btn btn-success" onclick="event.stopPropagation(); shareBill(${b.id})">Share PDF</button>
         <button class="btn btn-danger" onclick="event.stopPropagation(); deleteBill(${b.id})">Delete</button>
       </td>
     </tr>`).join('');
@@ -623,8 +834,6 @@ window.viewBill = async (id) => {
     <p><strong>Paid:</strong> ${Number(b.paid_amount || 0).toFixed(2)} &nbsp; <strong>Pending:</strong> ${Number(b.pending_amount || 0).toFixed(2)}</p>
     <div class="actions">
       <button class="btn btn-primary" onclick="editBill(${b.id})">Edit</button>
-      <button class="btn btn-primary" onclick="generatePdf(${b.id})">Save PDF</button>
-      <button class="btn btn-success" onclick="shareBill(${b.id})">Share PDF</button>
     </div>
     <table style="margin-top:8px;">
       <thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
@@ -681,6 +890,7 @@ window.editBill = async (id) => {
   document.getElementById('bill-number').value = b.bill_number || '';
   document.getElementById('bill-date').value = (b.bill_date || '').slice(0, 10);
   billCustomerSelect.value = b.customer_id;
+  setCustomerDropdownLabel();
   gstPercentEl.value = Number(b.gst_percent || 0);
   discountEl.value = Number(b.subtotal) > 0 ? ((Number(b.discount || 0) / Number(b.subtotal)) * 100).toFixed(2) : 0;
   if (paidAmountEl) paidAmountEl.value = Number(b.paid_amount || 0).toFixed(2);
@@ -688,13 +898,15 @@ window.editBill = async (id) => {
   await refreshItemOptions();
   for (const i of data.items) {
     const row = makeItemRow();
-    const select = row.children[0];
+    const itemIdInput = row.querySelector('input[type="hidden"]');
+    const searchInput = row.querySelector('.item-search-input');
     const size = row.children[1];
     const price = row.children[2];
     const qty = row.children[3];
     const total = row.children[4];
-    select.value = i.item_id;
-    select.dispatchEvent(new Event('change'));
+
+    itemIdInput.value = i.item_id;
+    searchInput.value = i.name;
     const sVal = i.size || '';
     const pVal = Number(i.price || 0);
     size.value = (sVal == '0' || sVal == '0.00') ? '' : sVal;
@@ -706,6 +918,24 @@ window.editBill = async (id) => {
   recalcTotals();
   document.getElementById('edit-bill-id').value = id;
   saveBillBtn.textContent = 'Update Bill';
+};
+
+window.resetBillForm = async () => {
+  document.getElementById('edit-bill-id').value = '';
+  document.getElementById('bill-number').value = '';
+  document.getElementById('bill-date').value = new Date().toISOString().slice(0, 10);
+  billCustomerSelect.value = '';
+  setCustomerDropdownLabel();
+  gstPercentEl.value = '0.00';
+  discountEl.value = '0';
+  if (paidAmountEl) paidAmountEl.value = '0';
+  billItemsWrapper.innerHTML = '';
+  await refreshItemOptions();
+  billItemsWrapper.appendChild(makeItemRow());
+  recalcTotals();
+  saveBillBtn.textContent = 'Save Bill';
+  if (invoiceArea) invoiceArea.classList.add('hidden');
+  await fetchNextBillNumber();
 };
 
 // Removed printBill
@@ -729,101 +959,169 @@ document.addEventListener('DOMContentLoaded', async () => {
     await Promise.all([loadItems(), loadCustomers(), loadBills()]);
     await loadDashboard();
     await ensureCompanyProfile();
+    await fetchNextBillNumber();
   }
 });
 
-window.shareBill = async (id) => {
-  await showInvoice(id);
-  const element = document.getElementById('invoice');
-  if (!element) return;
-
-  // Ensure the element is visible for html2pdf
-  element.classList.remove('hidden');
-
-  const billNo = document.getElementById('inv-no').textContent || 'bill';
-
-  const opt = {
-    margin: 10,
-    filename: `Bill_${billNo}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
+async function fetchNextBillNumber() {
+  const bill_num_el = document.getElementById('bill-number');
+  // Only auto-generate if we are not in edit mode
+  if (document.getElementById('edit-bill-id').value) return;
 
   try {
-    // Small delay to ensure all content (totals, logo) is painted
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
-    const file = new File([pdfBlob], `Bill_${billNo}.pdf`, { type: 'application/pdf' });
-
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: `Bill ${billNo}`,
-        text: `Invoice from ${currentProfile?.company_name || 'Alakhdhani Hardware'}`
-      });
-    } else {
-      // Fallback: Download and alert
-      html2pdf().set(opt).from(element).save();
-      alert('Sharing PDF directly is not supported on this browser. The PDF has been downloaded instead. You can now send it manually via WhatsApp.');
+    const res = await fetch('/api/bills/next-number');
+    const data = await res.json();
+    if (data.next_number) {
+      bill_num_el.value = data.next_number;
     }
   } catch (err) {
-    console.error('Sharing failed:', err);
-    alert('Failed to generate or share PDF.');
-  } finally {
-    // We don't necessarily want to hide it if we are viewing it, 
-    // but showInvoice(id) is usually called from View or Edit which might expect it visible.
-    // However, the tab switch logic might hide it. 
-    // For now, let's keep it visible since it's the "Invoice" being generated.
+    console.error('Failed to fetch next bill number:', err);
   }
-};
+}
 
-const shareBillWaBtn = document.getElementById('share-bill-wa');
-if (shareBillWaBtn) {
-  shareBillWaBtn.addEventListener('click', () => {
-    const billId = document.getElementById('edit-bill-id').value;
-    if (billId) {
-      shareBill(billId);
-    } else {
-      alert('Save the bill first to share on WhatsApp');
-    }
+const invSavePdfBtn = document.getElementById('invoice-save-pdf');
+const invSharePdfBtn = document.getElementById('invoice-share-pdf');
+
+async function renderPdfDoc(el, excludeInvoiceActions = false) {
+  const jspdfLib = window.jspdf;
+  if (jspdfLib && jspdfLib.jsPDF) {
+    const doc = new jspdfLib.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    await doc.html(el, {
+      x: 0, y: 0,
+      margin: [10, 10, 10, 10],
+      autoPaging: 'text',
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        scrollY: 0,
+        ignoreElements: (element) => {
+          if (!excludeInvoiceActions) return false;
+          const isActionBtn = element.id === 'invoice-save-pdf' || element.id === 'invoice-share-pdf';
+          const isInvoiceActionsBar = !!(element.closest && element.closest('#invoice')) && element.classList && element.classList.contains('actions');
+          return isActionBtn || isInvoiceActionsBar;
+        }
+      }
+    });
+    return doc;
+  } else {
+    const opt = {
+      margin: 0,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        scrollY: 0,
+        ignoreElements: (element) => {
+          if (!excludeInvoiceActions) return false;
+          const isActionBtn = element.id === 'invoice-save-pdf' || element.id === 'invoice-share-pdf';
+          const isInvoiceActionsBar = !!(element.closest && element.closest('#invoice')) && element.classList && element.classList.contains('actions');
+          return isActionBtn || isInvoiceActionsBar;
+        }
+      },
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['.tax-header', '.tax-title-bar', '.tax-meta-grid', '.tax-bottom-info', '.tax-footer'] },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    const worker = html2pdf().from(el).set(opt).toPdf();
+    const pdf = await worker.get('pdf');
+    return pdf;
+  }
+}
+
+async function saveElementPdf(el, filename, excludeInvoiceActions = false) {
+  if (!el) return;
+  const pdfDoc = await renderPdfDoc(el, excludeInvoiceActions);
+  if (pdfDoc.save) {
+    pdfDoc.save(filename);
+  } else {
+    const blob = pdfDoc.output('blob');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+  }
+}
+
+async function shareElementPdf(el, filename, excludeInvoiceActions = false) {
+  if (!el) return;
+  const pdfDoc = await renderPdfDoc(el, excludeInvoiceActions);
+  const blob = pdfDoc.output('blob');
+  const file = new File([blob], filename, { type: 'application/pdf' });
+  const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+  if (canShareFiles) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+    } catch {}
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+
+if (invSavePdfBtn) {
+  invSavePdfBtn.addEventListener('click', () => {
+    const invNoEl = document.getElementById('inv-no');
+    const invNoText = invNoEl?.textContent || '';
+    const billNum = invNoText.split(' / ')[0] || 'invoice';
+    const fname = `invoice_${billNum}.pdf`;
+    saveElementPdf(invoiceArea, fname, true);
+  });
+}
+if (invSharePdfBtn) {
+  invSharePdfBtn.addEventListener('click', () => {
+    const invNoEl = document.getElementById('inv-no');
+    const invNoText = invNoEl?.textContent || '';
+    const billNum = invNoText.split(' / ')[0] || 'invoice';
+    const fname = `invoice_${billNum}.pdf`;
+    shareElementPdf(invoiceArea, fname, true);
   });
 }
 
-window.generatePdf = async (id) => {
+if (newBillSavePdfBtn) {
+  newBillSavePdfBtn.addEventListener('click', async () => {
+    const id = document.getElementById('edit-bill-id').value;
+    if (!id) { alert('Please save the bill first'); return; }
+    await showInvoice(id);
+    const invNoEl = document.getElementById('inv-no');
+    const invNoText = invNoEl?.textContent || '';
+    const billNum = invNoText.split(' / ')[0] || 'invoice';
+    saveElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
+  });
+}
+if (newBillSharePdfBtn) {
+  newBillSharePdfBtn.addEventListener('click', async () => {
+    const id = document.getElementById('edit-bill-id').value;
+    if (!id) { alert('Please save the bill first'); return; }
+    await showInvoice(id);
+    const invNoEl = document.getElementById('inv-no');
+    const invNoText = invNoEl?.textContent || '';
+    const billNum = invNoText.split(' / ')[0] || 'invoice';
+    shareElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
+  });
+}
+
+window.downloadInvoicePdf = async (id) => {
   await showInvoice(id);
-  const element = document.getElementById('invoice');
-  if (!element) return;
-
-  element.classList.remove('hidden');
-
-  const billNo = document.getElementById('inv-no').textContent || 'bill';
-  const opt = {
-    margin: 10,
-    filename: `Bill_${billNo}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-
-  // Wait for rendering
-  setTimeout(() => {
-    html2pdf().set(opt).from(element).save();
-  }, 500);
+  const invNoEl = document.getElementById('inv-no');
+  const invNoText = invNoEl?.textContent || '';
+  const billNum = invNoText.split(' / ')[0] || 'invoice';
+  saveElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
+};
+window.shareInvoicePdf = async (id) => {
+  await showInvoice(id);
+  const invNoEl = document.getElementById('inv-no');
+  const invNoText = invNoEl?.textContent || '';
+  const billNum = invNoText.split(' / ')[0] || 'invoice';
+  shareElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
 };
 
-const savePdfBtn = document.getElementById('save-pdf-btn');
-if (savePdfBtn) {
-  savePdfBtn.addEventListener('click', () => {
-    const billId = document.getElementById('edit-bill-id').value;
-    if (billId) {
-      generatePdf(billId);
-    } else {
-      alert('Save the bill first to generate PDF');
-    }
-  });
-}
 
 // Dashboard
 async function loadDashboard() {
@@ -1020,12 +1318,19 @@ if (reportFetchBtn) reportFetchBtn.addEventListener('click', loadMonthlyReport);
 
 if (reportFetchBtn) reportFetchBtn.addEventListener('click', loadMonthlyReport);
 if (reportExportCsvBtn) reportExportCsvBtn.addEventListener('click', exportReportCsv);
+if (reportExportPdfBtn) reportExportPdfBtn.addEventListener('click', () => {
+  const area = document.getElementById('report-print-area');
+  const fname = `monthly_report_${reportCache.year}-${reportCache.month}.pdf`;
+  saveElementPdf(area, fname);
+});
 
 // Auto-load report when the tab is opened
 const navButtons = document.querySelectorAll('.nav button[data-tab]');
 navButtons.forEach(btn => {
   btn.addEventListener('click', () => {
-    if (btn.dataset.tab === 'report') {
+    if (btn.dataset.tab === 'new-bill') {
+      resetBillForm();
+    } else if (btn.dataset.tab === 'report') {
       if (!reportCache.rows || reportCache.rows.length === 0) {
         loadMonthlyReport();
       } else {
@@ -1087,6 +1392,11 @@ function ensureOutstandingLoaded() {
     renderOutstanding();
   }
 }
+if (outExportPdfBtn) outExportPdfBtn.addEventListener('click', () => {
+  const area = document.getElementById('out-print-area');
+  const fname = 'outstanding_report.pdf';
+  saveElementPdf(area, fname);
+});
 async function loadOutstanding() {
   const params = new URLSearchParams();
   if (outFrom?.value) params.set('from', outFrom.value);

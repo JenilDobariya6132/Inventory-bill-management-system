@@ -22,6 +22,30 @@ function verifyToken(token) {
     return null;
   }
 }
+router.get('/next-number', async (req, res) => {
+  try {
+    const payload = requireAuth(req);
+    if (!payload) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Attempt to find the max bill number that is numeric
+    const [rows] = await pool.query(
+      "SELECT bill_number FROM bills WHERE user_id = ? AND bill_number REGEXP '^[0-9]+$' ORDER BY CAST(bill_number AS UNSIGNED) DESC LIMIT 1",
+      [payload.uid]
+    );
+
+    let nextNum = 1;
+    if (rows.length > 0) {
+      nextNum = parseInt(rows[0].bill_number, 10) + 1;
+    }
+
+    // Format with leading zeros (e.g. 001, 002)
+    const formatted = String(nextNum).padStart(3, '0');
+    res.json({ next_number: formatted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 function requireAuth(req) {
   const auth = String(req.headers.authorization || '');
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';

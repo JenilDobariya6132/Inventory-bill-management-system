@@ -71,8 +71,8 @@ router.get('/monthly', async (req, res) => {
       JOIN bill_items bi ON bi.bill_id = b.id
       JOIN items i ON bi.item_id = i.id
       WHERE b.bill_date >= ? AND b.bill_date < ? AND b.user_id = ?
-      GROUP BY c.id, i.id, b.id
-      ORDER BY c.name ASC, i.name ASC, b.bill_date ASC, b.id ASC
+      GROUP BY c.id, i.id, bi.size, b.id
+      ORDER BY c.name ASC, i.name ASC, bi.size ASC, b.bill_date ASC, b.id ASC
       `,
       [from, to, payload.uid]
     );
