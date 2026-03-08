@@ -982,78 +982,75 @@ async function fetchNextBillNumber() {
 const invSavePdfBtn = document.getElementById('invoice-save-pdf');
 const invSharePdfBtn = document.getElementById('invoice-share-pdf');
 
-async function renderPdfDoc(el, excludeInvoiceActions = false) {
-  const jspdfLib = window.jspdf;
-  if (jspdfLib && jspdfLib.jsPDF) {
-    const doc = new jspdfLib.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    await doc.html(el, {
-      x: 0, y: 0,
-      margin: [10, 10, 10, 10],
-      autoPaging: 'text',
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        scrollY: 0,
-        ignoreElements: (element) => {
-          if (!excludeInvoiceActions) return false;
-          const isActionBtn = element.id === 'invoice-save-pdf' || element.id === 'invoice-share-pdf';
-          const isInvoiceActionsBar = !!(element.closest && element.closest('#invoice')) && element.classList && element.classList.contains('actions');
-          return isActionBtn || isInvoiceActionsBar;
-        }
+function buildPdfOptions(el, excludeInvoiceActions = false) {
+  return {
+    margin: 0,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      windowWidth: 794,
+      width: 794,
+      ignoreElements: (element) => {
+        if (!excludeInvoiceActions) return false;
+        const isActionBtn = element.id === 'invoice-save-pdf' || element.id === 'invoice-share-pdf';
+        const isInvoiceActionsBar = !!(element.closest && element.closest('#invoice')) && element.classList && element.classList.contains('actions');
+        return isActionBtn || isInvoiceActionsBar;
       }
-    });
-    return doc;
-  } else {
-    const opt = {
-      margin: 0,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        scrollY: 0,
-        ignoreElements: (element) => {
-          if (!excludeInvoiceActions) return false;
-          const isActionBtn = element.id === 'invoice-save-pdf' || element.id === 'invoice-share-pdf';
-          const isInvoiceActionsBar = !!(element.closest && element.closest('#invoice')) && element.classList && element.classList.contains('actions');
-          return isActionBtn || isInvoiceActionsBar;
-        }
-      },
-      pagebreak: { mode: ['css', 'legacy'], avoid: ['.tax-header', '.tax-title-bar', '.tax-meta-grid', '.tax-bottom-info', '.tax-footer'] },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    const worker = html2pdf().from(el).set(opt).toPdf();
-    const pdf = await worker.get('pdf');
-    return pdf;
+    },
+    pagebreak: { mode: ['css', 'legacy'], avoid: ['.tax-header', '.tax-title-bar', '.tax-meta-grid', '.tax-bottom-info', '.tax-footer'] },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+}
+
+async function withInvoiceCaptureStyles(fn) {
+  const el = invoiceArea;
+  if (!el) return await fn();
+
+  // Save the original style attribute string completely
+  const prevStyle = el.getAttribute('style') || '';
+
+  try {
+    // Override specifically for perfect A4 generation without offsets
+    el.style.setProperty('width', '794px', 'important');
+    el.style.setProperty('margin', '0', 'important');
+    el.style.setProperty('padding', '10px', 'important');
+    el.style.setProperty('box-sizing', 'border-box', 'important');
+    el.style.setProperty('max-width', 'none', 'important');
+
+    return await fn();
+  } finally {
+    // Restore exact original style string and scroll position
+    if (prevStyle) {
+      el.setAttribute('style', prevStyle);
+    } else {
+      el.removeAttribute('style');
+    }
   }
 }
 
 async function saveElementPdf(el, filename, excludeInvoiceActions = false) {
   if (!el) return;
-  const pdfDoc = await renderPdfDoc(el, excludeInvoiceActions);
-  if (pdfDoc.save) {
-    pdfDoc.save(filename);
-  } else {
-    const blob = pdfDoc.output('blob');
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
-  }
+  await withInvoiceCaptureStyles(async () => {
+    const opt = buildPdfOptions(el, excludeInvoiceActions);
+    await html2pdf().from(el).set(opt).save(filename);
+  });
 }
 
 async function shareElementPdf(el, filename, excludeInvoiceActions = false) {
   if (!el) return;
-  const pdfDoc = await renderPdfDoc(el, excludeInvoiceActions);
-  const blob = pdfDoc.output('blob');
+  const blob = await withInvoiceCaptureStyles(async () => {
+    const opt = buildPdfOptions(el, excludeInvoiceActions);
+    const worker = html2pdf().from(el).set(opt).toPdf();
+    const pdf = await worker.get('pdf');
+    return pdf.output('blob');
+  });
   const file = new File([blob], filename, { type: 'application/pdf' });
   const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [file] }));
   if (canShareFiles) {
     try {
       await navigator.share({ files: [file], title: filename });
-    } catch {}
+    } catch { }
     return;
   }
   const url = URL.createObjectURL(blob);

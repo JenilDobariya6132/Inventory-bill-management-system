@@ -729,6 +729,8 @@ tbody td {
   font-family: Arial, sans-serif;
   box-shadow: none;
   border: 1px solid #000;
+  box-sizing: border-box;
+  border-radius: 0;
 }
 
 .tax-header {
