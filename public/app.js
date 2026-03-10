@@ -612,6 +612,28 @@ saveBillBtn.addEventListener('click', async () => {
   await loadBills();
 });
 
+if (newBillSavePdfBtn) {
+  newBillSavePdfBtn.addEventListener('click', async () => {
+    const id = document.getElementById('edit-bill-id').value;
+    if (!id) { alert('Please save the bill first'); return; }
+    await showInvoice(id);
+    const invNoEl = document.getElementById('inv-no');
+    const invNoText = invNoEl?.textContent || '';
+    const billNum = invNoText.split(' / ')[0] || 'invoice';
+    saveElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
+  });
+}
+if (newBillSharePdfBtn) {
+  newBillSharePdfBtn.addEventListener('click', async () => {
+    const id = document.getElementById('edit-bill-id').value;
+    if (!id) { alert('Please save the bill first'); return; }
+    await showInvoice(id);
+    const invNoEl = document.getElementById('inv-no');
+    const invNoText = invNoEl?.textContent || '';
+    const billNum = invNoText.split(' / ')[0] || 'invoice';
+    shareElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
+  });
+}
 
 function numberToWords(amount) {
   const words = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
@@ -727,6 +749,142 @@ async function showInvoice(id) {
   invoiceArea.classList.remove('hidden');
 }
 
+function buildPdfOptions(el, excludeInvoiceActions = false) {
+  const widthPx = 794;
+  const heightPx = Math.max(1123, el?.scrollHeight || 1123);
+  return {
+    margin: 0,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      scrollY: 0,
+      windowWidth: widthPx,
+      width: widthPx,
+      height: heightPx,
+      letterRendering: true,
+      backgroundColor: '#ffffff',
+      allowTaint: true,
+      ignoreElements: (element) => {
+        if (!excludeInvoiceActions) return false;
+        const isActionBtn = element.id === 'invoice-save-pdf' || element.id === 'invoice-share-pdf';
+        const isInvoiceActionsBar = !!(element.closest && element.closest('#invoice')) && element.classList && element.classList.contains('actions');
+        return isActionBtn || isInvoiceActionsBar;
+      }
+    },
+    pagebreak: { mode: ['css', 'legacy'], avoid: ['.tax-header', '.tax-title-bar', '.tax-meta-grid', '.tax-bottom-info', '.tax-footer'] },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+}
+function withInvoiceCaptureStyles(fn) {
+  const el = invoiceArea;
+  if (!el) return fn();
+  const prev = { overflow: el.style.overflow, overflowX: el.style.overflowX, overflowY: el.style.overflowY, width: el.style.width, maxWidth: el.style.maxWidth, transform: el.style.transform, padding: el.style.padding, boxSizing: el.style.boxSizing, margin: el.style.margin };
+  try {
+    el.style.overflow = 'visible';
+    el.style.overflowX = 'visible';
+    el.style.overflowY = 'visible';
+    el.style.width = '210mm';
+    el.style.maxWidth = 'none';
+    el.style.transform = 'none';
+    el.style.padding = '10mm';
+    el.style.boxSizing = 'border-box';
+    el.style.margin = '0 auto';
+    return fn();
+  } finally {
+    el.style.overflow = prev.overflow;
+    el.style.overflowX = prev.overflowX;
+    el.style.overflowY = prev.overflowY;
+    el.style.width = prev.width;
+    el.style.maxWidth = prev.maxWidth;
+    el.style.transform = prev.transform;
+    el.style.padding = prev.padding;
+    el.style.boxSizing = prev.boxSizing;
+    el.style.margin = prev.margin;
+  }
+}
+function pxToMm(px) { return px * 25.4 / 96; }
+async function buildSinglePagePdf(el, excludeInvoiceActions = false) {
+  const jspdf = window.jspdf?.jsPDF;
+  if (!jspdf) throw new Error('jsPDF not available');
+  const actionsBar = el.querySelector('.actions');
+  const prevDisplay = actionsBar ? actionsBar.style.display : '';
+  if (excludeInvoiceActions && actionsBar) actionsBar.style.display = 'none';
+  try {
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      scrollY: 0,
+      width: el.scrollWidth,
+      height: el.scrollHeight,
+      backgroundColor: '#ffffff',
+      ignoreElements: (element) => {
+        if (!excludeInvoiceActions) return false;
+        const isActionBtn = element.id === 'invoice-save-pdf' || element.id === 'invoice-share-pdf';
+        const isInvoiceActionsBar = !!(element.closest && element.closest('#invoice')) && element.classList && element.classList.contains('actions');
+        return isActionBtn || isInvoiceActionsBar;
+      }
+    });
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+    const doc = new jspdf({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const imgWmm = pxToMm(canvas.width);
+    const imgHmm = pxToMm(canvas.height);
+    const margin = 8;
+    const scale = Math.min((pageW - margin * 2) / imgWmm, (pageH - margin * 2) / imgHmm);
+    const renderW = imgWmm * scale;
+    const renderH = imgHmm * scale;
+    const x = (pageW - renderW) / 2;
+    const y = (pageH - renderH) / 2;
+    doc.addImage(imgData, 'JPEG', x, y, renderW, renderH);
+    return { doc, restore: () => { if (actionsBar) actionsBar.style.display = prevDisplay; } };
+  } catch (e) {
+    if (actionsBar) actionsBar.style.display = prevDisplay;
+    throw e;
+  }
+}
+async function saveElementPdf(el, filename, excludeInvoiceActions = false) {
+  if (!el) return;
+  const { doc, restore } = await buildSinglePagePdf(el, excludeInvoiceActions);
+  try { doc.save(filename); } finally { restore(); }
+}
+async function shareElementPdf(el, filename, excludeInvoiceActions = false) {
+  if (!el) return;
+  const { doc, restore } = await buildSinglePagePdf(el, excludeInvoiceActions);
+  try {
+    const blob = doc.output('blob');
+    const file = new File([blob], filename, { type: 'application/pdf' });
+    const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+    if (canShareFiles) {
+      try { await navigator.share({ files: [file], title: filename }); } catch { }
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+  } finally {
+    restore();
+  }
+}
+window.downloadInvoicePdf = async (id) => {
+  await showInvoice(id);
+  const invNoEl = document.getElementById('inv-no');
+  const invNoText = invNoEl?.textContent || '';
+  const billNum = invNoText.split(' / ')[0] || 'invoice';
+  saveElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
+};
+window.shareInvoicePdf = async (id) => {
+  await showInvoice(id);
+  const invNoEl = document.getElementById('inv-no');
+  const invNoText = invNoEl?.textContent || '';
+  const billNum = invNoText.split(' / ')[0] || 'invoice';
+  shareElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
+};
 // Remove printBillBtn listener if it exists
 // printBillBtn.addEventListener('click', () => { ... });
 
@@ -978,147 +1136,6 @@ async function fetchNextBillNumber() {
     console.error('Failed to fetch next bill number:', err);
   }
 }
-
-const invSavePdfBtn = document.getElementById('invoice-save-pdf');
-const invSharePdfBtn = document.getElementById('invoice-share-pdf');
-
-function buildPdfOptions(el, excludeInvoiceActions = false) {
-  return {
-    margin: 0,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: {
-      scale: 2,
-      useCORS: true,
-      windowWidth: 794,
-      width: 794,
-      ignoreElements: (element) => {
-        if (!excludeInvoiceActions) return false;
-        const isActionBtn = element.id === 'invoice-save-pdf' || element.id === 'invoice-share-pdf';
-        const isInvoiceActionsBar = !!(element.closest && element.closest('#invoice')) && element.classList && element.classList.contains('actions');
-        return isActionBtn || isInvoiceActionsBar;
-      }
-    },
-    pagebreak: { mode: ['css', 'legacy'], avoid: ['.tax-header', '.tax-title-bar', '.tax-meta-grid', '.tax-bottom-info', '.tax-footer'] },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-}
-
-async function withInvoiceCaptureStyles(fn) {
-  const el = invoiceArea;
-  if (!el) return await fn();
-
-  // Save the original style attribute string completely
-  const prevStyle = el.getAttribute('style') || '';
-
-  try {
-    // Override specifically for perfect A4 generation without offsets
-    el.style.setProperty('width', '794px', 'important');
-    el.style.setProperty('margin', '0', 'important');
-    el.style.setProperty('padding', '10px', 'important');
-    el.style.setProperty('box-sizing', 'border-box', 'important');
-    el.style.setProperty('max-width', 'none', 'important');
-
-    return await fn();
-  } finally {
-    // Restore exact original style string and scroll position
-    if (prevStyle) {
-      el.setAttribute('style', prevStyle);
-    } else {
-      el.removeAttribute('style');
-    }
-  }
-}
-
-async function saveElementPdf(el, filename, excludeInvoiceActions = false) {
-  if (!el) return;
-  await withInvoiceCaptureStyles(async () => {
-    const opt = buildPdfOptions(el, excludeInvoiceActions);
-    await html2pdf().from(el).set(opt).save(filename);
-  });
-}
-
-async function shareElementPdf(el, filename, excludeInvoiceActions = false) {
-  if (!el) return;
-  const blob = await withInvoiceCaptureStyles(async () => {
-    const opt = buildPdfOptions(el, excludeInvoiceActions);
-    const worker = html2pdf().from(el).set(opt).toPdf();
-    const pdf = await worker.get('pdf');
-    return pdf.output('blob');
-  });
-  const file = new File([blob], filename, { type: 'application/pdf' });
-  const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [file] }));
-  if (canShareFiles) {
-    try {
-      await navigator.share({ files: [file], title: filename });
-    } catch { }
-    return;
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
-}
-
-if (invSavePdfBtn) {
-  invSavePdfBtn.addEventListener('click', () => {
-    const invNoEl = document.getElementById('inv-no');
-    const invNoText = invNoEl?.textContent || '';
-    const billNum = invNoText.split(' / ')[0] || 'invoice';
-    const fname = `invoice_${billNum}.pdf`;
-    saveElementPdf(invoiceArea, fname, true);
-  });
-}
-if (invSharePdfBtn) {
-  invSharePdfBtn.addEventListener('click', () => {
-    const invNoEl = document.getElementById('inv-no');
-    const invNoText = invNoEl?.textContent || '';
-    const billNum = invNoText.split(' / ')[0] || 'invoice';
-    const fname = `invoice_${billNum}.pdf`;
-    shareElementPdf(invoiceArea, fname, true);
-  });
-}
-
-if (newBillSavePdfBtn) {
-  newBillSavePdfBtn.addEventListener('click', async () => {
-    const id = document.getElementById('edit-bill-id').value;
-    if (!id) { alert('Please save the bill first'); return; }
-    await showInvoice(id);
-    const invNoEl = document.getElementById('inv-no');
-    const invNoText = invNoEl?.textContent || '';
-    const billNum = invNoText.split(' / ')[0] || 'invoice';
-    saveElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
-  });
-}
-if (newBillSharePdfBtn) {
-  newBillSharePdfBtn.addEventListener('click', async () => {
-    const id = document.getElementById('edit-bill-id').value;
-    if (!id) { alert('Please save the bill first'); return; }
-    await showInvoice(id);
-    const invNoEl = document.getElementById('inv-no');
-    const invNoText = invNoEl?.textContent || '';
-    const billNum = invNoText.split(' / ')[0] || 'invoice';
-    shareElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
-  });
-}
-
-window.downloadInvoicePdf = async (id) => {
-  await showInvoice(id);
-  const invNoEl = document.getElementById('inv-no');
-  const invNoText = invNoEl?.textContent || '';
-  const billNum = invNoText.split(' / ')[0] || 'invoice';
-  saveElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
-};
-window.shareInvoicePdf = async (id) => {
-  await showInvoice(id);
-  const invNoEl = document.getElementById('inv-no');
-  const invNoText = invNoEl?.textContent || '';
-  const billNum = invNoText.split(' / ')[0] || 'invoice';
-  shareElementPdf(invoiceArea, `invoice_${billNum}.pdf`, true);
-};
-
 
 // Dashboard
 async function loadDashboard() {
