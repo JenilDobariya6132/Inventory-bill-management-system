@@ -909,7 +909,7 @@ async function loadBills(customerId) {
   billsCache = bills;
   billsTableBody.innerHTML = bills.map(b => `
     <tr>
-      <td>${b.id}</td><td>${b.bill_number}</td><td>${String(b.bill_date || '').slice(0, 10)}</td><td>${b.customer_name}</td>
+      <td>${b.id}</td><td>${b.bill_number}</td><td>${dateOnly(b.bill_date)}</td><td>${b.customer_name}</td>
       <td>${Number(b.subtotal).toFixed(2)}</td><td>${Number(b.gst_amount).toFixed(2)}</td><td>${Number(b.discount).toFixed(2)}</td><td><strong>${Number(b.grand_total).toFixed(2)}</strong></td>
       <td>${Number(b.paid_amount || 0).toFixed(2)}</td><td><strong style="color:${Number(b.pending_amount || 0) > 0 ? '#ef4444' : '#16a34a'}">${Number(b.pending_amount || 0).toFixed(2)}</strong></td>
       <td>
@@ -947,7 +947,7 @@ async function runSearch() {
   const rows = await res.json();
   searchResultsBody.innerHTML = rows.map(b => `
     <tr onclick="viewBill(${b.id})" style="cursor:pointer">
-      <td>${b.bill_number}</td><td>${String(b.bill_date || '').slice(0, 10)}</td><td>${b.customer_name}</td>
+      <td>${b.bill_number}</td><td>${dateOnly(b.bill_date)}</td><td>${b.customer_name}</td>
       <td>${Number(b.grand_total).toFixed(2)}</td><td>${Number(b.paid_amount || 0).toFixed(2)}</td>
       <td><strong style="color:${Number(b.pending_amount || 0) > 0 ? '#ef4444' : '#16a34a'}">${Number(b.pending_amount || 0).toFixed(2)}</strong></td>
       <td>${b.status}</td>
@@ -1255,7 +1255,7 @@ function renderMonthlyReport() {
         <td>${r.customer_name}</td>
         <td>${r.item_name}</td>
         <td>${(r.size == '0' || r.size == '0.00' || !r.size) ? '' : r.size}</td>
-        <td>${String(r.bill_date || '').slice(0, 10)}</td>
+        <td>${dateOnly(r.bill_date)}</td>
         <td>${r.bill_number}</td>
         <td>${Number(r.quantity).toFixed(0)}</td>
         <td>${Number(r.amount).toFixed(2)}</td>
@@ -1315,7 +1315,7 @@ function exportReportCsv() {
       `"${(r.customer_name || '').replace(/"/g, '""')}"`,
       `"${(r.item_name || '').replace(/"/g, '""')}"`,
       `"${(r.size || '').replace(/"/g, '""')}"`,
-      String(r.bill_date || '').slice(0, 10),
+      dateOnly(r.bill_date),
       `"${(r.bill_number || '').replace(/"/g, '""')}"`,
       Number(r.quantity || 0).toFixed(0),
       Number(r.amount || 0).toFixed(2),
@@ -1478,7 +1478,7 @@ async function loadOutstandingDetail(id, name) {
   outDetailBody.innerHTML = rows.map(b => `
     <tr>
       <td>${b.bill_number}</td>
-      <td>${String(b.bill_date || '').slice(0, 10)}</td>
+      <td>${dateOnly(b.bill_date)}</td>
       <td>${Number(b.grand_total || 0).toFixed(2)}</td>
       <td>${Number(b.paid_amount || 0).toFixed(2)}</td>
       <td class="${Number(b.pending_amount || 0) > 0 ? 'pending-red' : ''}">${Number(b.pending_amount || 0).toFixed(2)}</td>
