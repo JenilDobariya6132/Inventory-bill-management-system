@@ -9,10 +9,19 @@ const API = {
 function dateOnly(v) {
   if (!v) return '';
   const s = String(v);
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const d = new Date(s);
-  if (!isNaN(d)) return d.toISOString().slice(0, 10);
-  return s.slice(0, 10);
+  let y = '', m = '', d = '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    y = s.slice(2, 4);
+    m = s.slice(5, 7);
+    d = s.slice(8, 10);
+  } else {
+    const dt = new Date(s);
+    if (isNaN(dt)) return '';
+    y = String(dt.getFullYear()).slice(2);
+    m = String(dt.getMonth() + 1).padStart(2, '0');
+    d = String(dt.getDate()).padStart(2, '0');
+  }
+  return `${d}-${m}-${y}`;
 }
 
 const tabs = document.querySelectorAll('.nav button');
