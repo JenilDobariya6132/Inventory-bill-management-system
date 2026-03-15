@@ -692,7 +692,7 @@ async function showInvoice(id) {
     const compPan = document.getElementById('company-pan');
     const footComp = document.getElementById('footer-company-name');
 
-    if (compName) compName.textContent = currentProfile.company_name || 'RAVE INDIA LTD.';
+    if (compName) compName.textContent = currentProfile.company_name || 'Alakhdhani Hardwear';
     if (compAddr) compAddr.textContent = currentProfile.address || '';
     if (compGst) compGst.textContent = currentProfile.gst_id || 'N/A';
     if (compPan) compPan.textContent = currentProfile.pan_no || 'N/A';
