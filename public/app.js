@@ -244,8 +244,14 @@ window.deleteItem = async (id) => {
 itemForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const id = document.getElementById('item-id').value;
+  const name = document.getElementById('item-name').value;
+  const existing = itemsCache.find(i => i.name.toLowerCase() === name.toLowerCase());
+  if (existing && existing.id != id) {
+    alert('Item with this name already exists.');
+    return;
+  }
   const payload = {
-    name: document.getElementById('item-name').value,
+    name: name,
     quantity: Number(document.getElementById('item-qty').value),
   };
   if (id) {
@@ -720,8 +726,9 @@ async function showInvoice(id) {
   // Items Table
   const itemsBody = document.getElementById('invoice-items-body');
   if (itemsBody) {
-    itemsBody.innerHTML = data.items.map((i) =>
+    itemsBody.innerHTML = data.items.map((i, index) =>
       `<tr>
+        <td>${index + 1}</td>
         <td>${i.name}</td>
         <td style="text-align: center;">${(i.size && i.size != '0' && i.size != '0.00') ? `${i.size} in` : '-'}</td>
         <td style="text-align: center;">${i.quantity}</td>
@@ -1066,6 +1073,7 @@ window.editBill = async (id) => {
   for (const i of data.items) {
     const row = makeItemRow();
     const itemIdInput = row.querySelector('input[type="hidden"]');
+    const dropdownBtn = row.querySelector('.item-dropdown-btn');
     const searchInput = row.querySelector('.item-search-input');
     const size = row.children[1];
     const price = row.children[2];
@@ -1073,6 +1081,7 @@ window.editBill = async (id) => {
     const total = row.children[4];
 
     itemIdInput.value = i.item_id;
+    dropdownBtn.textContent = i.name;
     searchInput.value = i.name;
     const sVal = i.size || '';
     const pVal = Number(i.price || 0);
