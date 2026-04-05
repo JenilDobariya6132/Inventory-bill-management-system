@@ -1211,6 +1211,7 @@ const reportMonthSel = document.getElementById('report-month');
 const reportYearSel = document.getElementById('report-year');
 const reportFetchBtn = document.getElementById('report-fetch');
 const reportExportCsvBtn = document.getElementById('report-export-csv');
+const reportPrintBtn = document.getElementById('report-print-btn');
 const reportExportPdfBtn = document.getElementById('report-export-pdf');
 const reportTableBody = document.querySelector('#report-table tbody');
 const reportTitle = document.getElementById('report-title');
@@ -1218,6 +1219,10 @@ const gtQty = document.getElementById('gt-qty');
 const gtAmount = document.getElementById('gt-amount');
 const gtPaid = document.getElementById('gt-paid');
 const gtPending = document.getElementById('gt-pending');
+const cardQty = document.getElementById('card-gt-qty');
+const cardAmount = document.getElementById('card-gt-amount');
+const cardPaid = document.getElementById('card-gt-paid');
+const cardPending = document.getElementById('card-gt-pending');
 const custTotalsBody = document.querySelector('#customer-totals tbody');
 const itemTotalsBody = document.querySelector('#item-totals tbody');
 let reportCache = { rows: [], totals: { quantity: 0, amount: 0, paid: 0, pending: 0 }, month: '', year: '' };
@@ -1278,6 +1283,12 @@ function renderMonthlyReport() {
   if (gtAmount) gtAmount.textContent = Number(totals.amount || 0).toFixed(2);
   if (gtPaid) gtPaid.textContent = Number(totals.paid || 0).toFixed(2);
   if (gtPending) gtPending.textContent = Number(totals.pending || 0).toFixed(2);
+
+  // Update summary cards
+  if (cardQty) cardQty.textContent = Number(totals.quantity || 0).toFixed(0);
+  if (cardAmount) cardAmount.textContent = Number(totals.amount || 0).toFixed(2);
+  if (cardPaid) cardPaid.textContent = Number(totals.paid || 0).toFixed(2);
+  if (cardPending) cardPending.textContent = Number(totals.pending || 0).toFixed(2);
 
   // Customer-wise totals
   const custAgg = new Map();
@@ -1355,6 +1366,12 @@ if (reportExportPdfBtn) reportExportPdfBtn.addEventListener('click', () => {
   const fname = `monthly_report_${reportCache.year}-${reportCache.month}.pdf`;
   saveElementPdf(area, fname);
 });
+
+if (reportPrintBtn) {
+  reportPrintBtn.addEventListener('click', () => {
+    window.print();
+  });
+}
 
 // Auto-load report when the tab is opened
 const navButtons = document.querySelectorAll('.nav button[data-tab]');

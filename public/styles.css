@@ -410,101 +410,138 @@ tbody td {
 }
 
 #report .card {
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
 }
 
 #report .form-grid {
-  /* Removed hard-coded columns, falling back to form-grid fluid columns */
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  align-items: center;
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
 }
 
-#report .form-grid select {
-  height: 42px;
+#report-summary-cards .card.stat {
+  padding: 24px;
+  border-left: 4px solid var(--accent);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: white;
 }
 
-#report .form-grid button {
-  height: 42px;
-  font-weight: 600;
+#report-summary-cards .card.stat:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
 #report-title {
-  margin: 6px 0 12px 0;
-  font-size: 18px;
-  color: #1f2937;
+  margin: 0 0 24px 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border-bottom: 3px solid #f1f5f9;
+  padding-bottom: 12px;
 }
 
 #report-table {
-  border-collapse: separate;
-  border-spacing: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  overflow: hidden;
+  border-collapse: collapse;
+  margin-top: 10px;
+  width: 100%;
 }
 
 #report-table thead th {
-  background: #eef2ff;
-  color: #111827;
+  background: #f8fafc;
+  color: #64748b;
   font-weight: 700;
-  letter-spacing: .2px;
+  text-transform: uppercase;
+  font-size: 11px;
+  padding: 16px;
+  border-bottom: 2px solid #e2e8f0;
 }
 
-#report-table tbody tr:nth-child(odd) td {
-  background: #fbfdff;
+#report-table tbody td {
+  padding: 16px;
+  font-size: 14px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 #report-table tbody tr:hover td {
-  background: #f0f7ff;
+  background: #f8fafc;
 }
 
-#report-table td:nth-child(5),
 #report-table td:nth-child(6),
 #report-table td:nth-child(7),
-#report-table td:nth-child(8) {
+#report-table td:nth-child(8),
+#report-table td:nth-child(9) {
   text-align: right;
+  font-weight: 600;
 }
 
 #report-table tfoot td {
-  background: #f8fafc;
-  font-weight: 700;
+  background: #f1f5f9;
+  font-weight: 800;
+  color: #0f172a;
+  padding: 18px;
+}
+
+.totals.mt {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 40px;
+}
+
+.totals.mt h4 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: #1e293b;
+  border-left: 4px solid #cbd5e1;
+  padding-left: 12px;
 }
 
 #customer-totals,
 #item-totals {
-  border-collapse: separate;
-  border-spacing: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
-#customer-totals thead th,
-#item-totals thead th {
-  background: #f1f5f9;
-  color: #111827;
-  font-weight: 700;
+#report-print-area {
+  padding: 40px;
+  border: none;
+  background: white;
 }
 
-#customer-totals td:nth-child(2),
-#customer-totals td:nth-child(3),
-#customer-totals td:nth-child(4),
-#customer-totals td:nth-child(5),
-#item-totals td:nth-child(2),
-#item-totals td:nth-child(3),
-#item-totals td:nth-child(4),
-#item-totals td:nth-child(5) {
-  text-align: right;
-}
-
-#customer-totals tbody tr:nth-child(odd) td,
-#item-totals tbody tr:nth-child(odd) td {
-  background: #fbfdff;
-}
-
-#customer-totals tbody tr:hover td,
-#item-totals tbody tr:hover td {
-  background: #f0f7ff;
+/* Print Optimization */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #report-print-area, #report-print-area * {
+    visibility: visible;
+  }
+  #report-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  #report-table, #customer-totals, #item-totals {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
 }
 
 #out-table,

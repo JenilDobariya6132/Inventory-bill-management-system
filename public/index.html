@@ -120,7 +120,27 @@
         </select>
         <select id="report-year"></select>
         <button id="report-fetch">Fetch</button>
-        <button id="report-export-csv">Export Excel</button>
+        <button id="report-export-csv" class="btn btn-success">Export Excel</button>
+        <button id="report-print-btn" class="btn btn-primary">Print Report</button>
+      </div>
+      
+      <div id="report-summary-cards" class="dash-grid mt">
+        <div class="card stat">
+          <div class="stat-title">Total Qty</div>
+          <div class="stat-value" id="card-gt-qty">0</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-title">Total Amount</div>
+          <div class="stat-value">₹<span id="card-gt-amount">0.00</span></div>
+        </div>
+        <div class="card stat">
+          <div class="stat-title">Total Paid</div>
+          <div class="stat-value">₹<span id="card-gt-paid">0.00</span></div>
+        </div>
+        <div class="card stat">
+          <div class="stat-title">Total Pending</div>
+          <div class="stat-value pending-red">₹<span id="card-gt-pending">0.00</span></div>
+        </div>
       </div>
       <div class="card" id="report-print-area">
         <div class="dash-header">
